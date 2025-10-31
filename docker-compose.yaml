@@ -1,0 +1,56 @@
+version: '3.3'
+services:
+  servico-a:
+    network_mode: host
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    build:
+      context: ./servico-a
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVICE_B_URL=http://servico-b:8081/process
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces
+    depends_on:
+      - servico-b
+      - otel-collector
+  
+  
+  servico-b:
+    network_mode: host
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    build:
+      context: ./servico-b
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - WEATHER_API_KEY=YOUR_WEATHERAPI_KEY
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces
+      - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - otel-collector
+  
+  
+  otel-collector:
+    image: otel/opentelemetry-collector:0.74.0
+    volumes:
+      - ./otel-collector/config.yml:/etc/otel-collector-config.yml
+    command: ["--config", "/etc/otel-collector-config.yml"]
+    ports:
+      - "4318:4318" # OTLP HTTP
+  
+  
+  zipkin:
+    image: openzipkin/zipkin:2.23.2
+    ports:
+      - "9411:9411"
+
+
+networks:
+  default:
+    driver: bridge

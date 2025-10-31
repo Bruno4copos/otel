@@ -1,0 +1,7 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+[remote "origin"]
+	url = https://github.com/open-telemetry/opentelemetry-go-contrib
+	fetch = +refs/heads/*:refs/remotes/origin/*
