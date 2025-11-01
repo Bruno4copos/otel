@@ -52,3 +52,40 @@ Este projeto contém **dois microsserviços em Go** que, juntos, recebem um CEP 
    ```bash
    make up
    ```
+
+## 🧪 Testando os Serviços
+
+Após subir o ambiente:
+
+   ```bash
+   make up
+   ```
+🔹 Testes com o VS Code REST Client ou Postman
+
+1. Abra o arquivo requests.http na raiz do projeto.
+
+2. No VS Code, clique em "Send Request" acima de cada bloco de requisição.
+
+3. Teste os seguintes cenários:
+
+	* CEP válido → Retorna cidade e temperaturas (C, F, K)
+	* CEP inválido (menos de 8 dígitos) → Retorna erro 422 invalid zipcode
+	* CEP inexistente → Retorna erro 404 can not find zipcode
+
+4. Você também pode acessar Zipkin UI para verificar o tracing distribuído:
+
+	* URL: http://localhost:9411
+
+🔹 Testes manuais via curl
+
+   ```bash
+   curl -X POST http://localhost:8080/ \
+        -H "Content-Type: application/json" \
+        -d '{"cep":"01001000"}'
+   ```
+
+Isso permite verificar o trace distribuído entre serviço A e serviço B.
+
+```bash
+curl http://localhost:9411
+```
