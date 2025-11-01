@@ -49,7 +49,7 @@ func cepHandler(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(body)
 	url := os.Getenv("SERVICE_B_URL")
 	if url == "" {
-		url = "http://servico-b:8081/process"
+		url = "http://servico-b:8081"
 	}
 
 	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport), Timeout: 10 * time.Second}
