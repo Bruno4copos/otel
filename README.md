@@ -12,6 +12,9 @@ Este projeto contém **dois microsserviços em Go** que, juntos, recebem um CEP 
 │ ├── main.go
 │ ├── handler.go
 │ └── tracer.go
+| └── Dockerfile
+| └── go.mod
+| └── go.sum
 │
 ├── servico-b/ # Serviço B: busca cidade e clima
 │ ├── main.go
@@ -19,7 +22,14 @@ Este projeto contém **dois microsserviços em Go** que, juntos, recebem um CEP 
 │ ├── cep.go
 │ ├── weather.go
 │ └── tracer.go
+| └── Dockerfile
+| └── go.mod
+| └── go.sum
 │
+├── otel-collector/
+| └── config.yaml
+| └── Dockerfile
+|
 ├── docker-compose.yml # Orquestra tudo (serviços + OTEL Collector + Zipkin)
 ├── Makefile # Facilita build e execução
 └── README.md

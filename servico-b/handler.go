@@ -3,8 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -41,6 +44,8 @@ func HandleWeatherByCEP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Received request for CEP: %v", req.CEP)
+
 	// valida formato do CEP
 	if len(req.CEP) != 8 {
 		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
@@ -52,6 +57,7 @@ func HandleWeatherByCEP(w http.ResponseWriter, r *http.Request) {
 	// busca cidade via ViaCEP (modulo cep.go)
 	city, err := GetCityByCEP(ctx, req.CEP)
 	if err != nil {
+		log.Printf("error GetCityByCEP: %v", err)
 		if err == ErrInvalidCEP {
 			http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
 			return
@@ -68,6 +74,7 @@ func HandleWeatherByCEP(w http.ResponseWriter, r *http.Request) {
 	// busca temperatura via WeatherAPI (modulo weather.go)
 	tempC, err := GetTemperatureByCity(ctx, city)
 	if err != nil {
+		log.Printf("error GetTemperatureByCity: %v", err)
 		http.Error(w, fmt.Sprintf("error fetching weather: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -78,6 +85,7 @@ func HandleWeatherByCEP(w http.ResponseWriter, r *http.Request) {
 		TempF: CelsiusToFahrenheit(tempC),
 		TempK: CelsiusToKelvin(tempC),
 	}
+	log.Printf("Responding with city=%s tempC=%.2f", resp.City, resp.TempC)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -103,4 +111,45 @@ func HealthHandler(w http.ResponseWriter, _ *http.Request) {
 func RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/weather", HandleWeatherByCEP)
 	mux.HandleFunc("/healthz", HealthHandler)
+}
+
+func handleWeather(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tracer := otel.Tracer("servico-b")
+	ctx, span := tracer.Start(ctx, "handleWeather")
+	defer span.End()
+
+	var req CepRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	span.SetAttributes(attribute.String("cep", req.CEP))
+
+	viaCepURL := fmt.Sprintf("https://viacep.com.br/ws/%s/json/", req.CEP)
+	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+
+	resp, err := client.Get(viaCepURL)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to fetch cep: %v", err), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(body, &data)
+
+	cidade := fmt.Sprintf("%v", data["localidade"])
+	if cidade == "" {
+		http.Error(w, "cidade não encontrada", http.StatusNotFound)
+		return
+	}
+
+	tempC := 22.3
+	respJSON, _ := json.Marshal(WeatherResponse{
+		City: cidade, TempC: tempC, TempF: tempC*1.8 + 32, TempK: tempC + 273,
+	})
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(respJSON)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -27,7 +29,7 @@ type cepRequest struct {
 }
 
 func cepHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -49,7 +51,7 @@ func cepHandler(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(body)
 	url := os.Getenv("SERVICE_B_URL")
 	if url == "" {
-		url = "http://servico-b:8081"
+		url = "http://servico-b:8081/weather"
 	}
 
 	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport), Timeout: 10 * time.Second}
@@ -71,4 +73,41 @@ func cepHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(res.StatusCode)
 	io.Copy(w, res.Body)
+}
+
+func handleCEP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tracer := otel.Tracer("servico-a")
+	ctx, span := tracer.Start(ctx, "handleCEP")
+	defer span.End()
+
+	var req CepRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	span.SetAttributes(attribute.String("cep.input", req.CEP))
+
+	serviceBURL := os.Getenv("SERVICE_B_URL")
+	if serviceBURL == "" {
+		serviceBURL = "http://servico-b:8081/weather"
+	}
+
+	body, _ := json.Marshal(map[string]string{"cep": req.CEP})
+	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+
+	reqB, _ := http.NewRequestWithContext(ctx, "POST", serviceBURL, bytes.NewReader(body))
+	reqB.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(reqB)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error calling service-b: %v", err), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(respBody)
 }

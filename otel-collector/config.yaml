@@ -1,16 +1,26 @@
 receivers:
   otlp:
     protocols:
+      grpc:
       http:
 
-
 exporters:
+  logging:
+    verbosity: detailed
   zipkin:
     endpoint: "http://zipkin:9411/api/v2/spans"
+    format: proto
+    default_service_name: otel-collector
 
+processors:
+  batch:
 
 service:
+  telemetry:
+    logs:
+      level: debug
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [zipkin]
+      processors: [batch]
+      exporters: [logging, zipkin]

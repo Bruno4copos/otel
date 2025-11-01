@@ -1,25 +1,24 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-func main() {
-	// initialize tracer
-	if err := initTracer(); err != nil {
-		log.Printf("otel init error: %v", err)
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/cep", cepHandler)
-	mux.HandleFunc("/healthz", healthHandler)
-
-	log.Println("servico-a listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+type CepRequest struct {
+	CEP string `json:"cep"`
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+func main() {
+	shutdown := initTracer()
+	defer shutdown(context.Background())
+
+	handler := otelhttp.NewHandler(http.HandlerFunc(handleCEP), "/cep")
+	http.Handle("/cep", handler)
+
+	log.Println("🚀 servico-a listening on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

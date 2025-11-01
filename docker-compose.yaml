@@ -1,67 +1,69 @@
 version: '3.3'
+
+
+networks:
+  otel:
+    driver: bridge
+
 services:
-  servico-a:
-    container_name: otel_servico-a
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    build:
-      context: ./servico-a
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - SERVICE_B_URL=http://servico-b:8081
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-    depends_on:
-      - servico-b
-      - otel-collector
-    networks:
-      - otel
-  
-  
-  servico-b:
-    container_name: otel_servico-b
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    build:
-      context: ./servico-b
-      dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
-    environment:
-      - WEATHER_API_KEY=YOUR_WEATHERAPI_KEY
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
-    depends_on:
-      - otel-collector
-    networks:
-      - otel
-  
-  
+
   otel-collector:
-    image: otel/opentelemetry-collector:0.74.0
+    build:
+      context: ./otel-collector
+      dockerfile: Dockerfile
     container_name: otel-collector
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel/config.yaml
-    command: ["--config", "/etc/otel/config.yaml"]
     ports:
       - "4317:4317"
       - "4318:4318"
+      - "8888:8888"
+    depends_on:
+      - zipkin
     networks:
       - otel
-  
-  
+
   zipkin:
-    image: openzipkin/zipkin:2.23.2
+    image: openzipkin/zipkin
     container_name: zipkin
     ports:
       - "9411:9411"
     networks:
       - otel
 
+  servico-b:
+    build: ./servico-b
+    container_name: otel_servico-b
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8081:8081"
+    environment:
+      - WEATHER_API_KEY=19041265099a413dbfb183552253108
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SERVICE_NAME=servico-b
+      - SERVICE_PORT=8081
+      - OTEL_SERVICE_NAME=servico-b
+    depends_on:
+      - otel-collector
+    networks:
+      - otel
 
-networks:
-  otel:
-    driver: bridge
+  servico-a:
+    build: ./servico-a
+    container_name: otel_servico-a
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVICE_B_URL=http://servico-b:8081/weather
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SERVICE_NAME=servico-a
+      - SERVICE_PORT=8080
+      - WEATHER_SERVICE_URL=http://servico-b:8081/weather
+      - OTEL_SERVICE_NAME=servico-a
+    depends_on:
+      - servico-b
+      - otel-collector
+    networks:
+      - otel
