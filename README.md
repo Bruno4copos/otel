@@ -50,12 +50,10 @@ Este projeto contém **dois microsserviços em Go** que, juntos, recebem um CEP 
 
 1. **Configure as variáveis de ambiente**
 
-   Crie um arquivo `.env` na raiz do projeto com o seguinte conteúdo:
-
-   ```bash
-   WEATHER_API_KEY=sua_chave_aqui
-   OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces
-   ```
+   Todas as variáveis de ambiente são definidas nos respectivos arquivos Dockerfile em:
+   - `servico-a/Dockerfile`
+   - `servico-b/Dockerfile`
+   - `otel-collector/Dockerfile`
 
 2. **Suba todo o ambiente**
 
