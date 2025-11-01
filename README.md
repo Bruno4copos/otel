@@ -1,99 +1,111 @@
-# 🌤️ Serviço de Clima por CEP (com OpenTelemetry + Zipkin)
+# 🌤️ Serviço de Clima por CEP com Observabilidade (OpenTelemetry + Zipkin)
 
-Este projeto contém **dois microsserviços em Go** que, juntos, recebem um CEP e retornam o clima atual da cidade correspondente, com métricas e tracing distribuído via **OpenTelemetry** e **Zipkin**.
+Este projeto demonstra **observabilidade distribuída** em uma arquitetura de **microsserviços Go**, que recebem um CEP, localizam a cidade e retornam o clima atual com métricas e tracing via **OpenTelemetry** e **Zipkin**.
 
----
 
-## 🧩 Estrutura do Projeto
-
-```
-.
-├── servico-a/ # Serviço A: recebe o input do usuário
-│ ├── main.go
-│ ├── handler.go
-│ └── tracer.go
-| └── Dockerfile
-| └── go.mod
-| └── go.sum
-│
-├── servico-b/ # Serviço B: busca cidade e clima
-│ ├── main.go
-│ ├── handler.go
-│ ├── cep.go
-│ ├── weather.go
-│ └── tracer.go
-| └── Dockerfile
-| └── go.mod
-| └── go.sum
-│
-├── otel-collector/
-| └── config.yaml
-| └── Dockerfile
-|
-├── docker-compose.yml # Orquestra tudo (serviços + OTEL Collector + Zipkin)
-├── Makefile # Facilita build e execução
-└── README.md
-```
+   - **Serviço A (API CEP)** → recebe um CEP (8 dígitos) via `POST /cep`, valida e repassa ao Serviço B.
+   - **Serviço B (API Clima)** → consulta a [ViaCEP](https://viacep.com.br) para obter a cidade e usa a API de clima (OpenWeather) para buscar as temperaturas em Celsius, Fahrenheit e Kelvin.
+   - Ambos enviam **traces para o OpenTelemetry Collector**, que exporta os dados para o **Zipkin UI**, permitindo visualizar a cadeia completa: `servico-a → servico-b → APIs externas`.
 
 ---
 
-## ⚙️ Requisitos
+## 🧰 Pré-requisitos
 
-- Go 1.22+
-- Docker + Docker Compose
-- Conta gratuita no [WeatherAPI](https://www.weatherapi.com/) (necessário `API_KEY`)
-- Internet (para consumir ViaCEP e WeatherAPI)
+   - Chave de API de clima configurada na variável `WEATHER_API_KEY` (definida no `docker-compose.yaml`)  
+   - Acesso à internet para chamadas às APIs externas (ViaCEP e OpenWeather)   
 
 ---
 
-## 🚀 Execução com Docker
+## 🧩 Estrutura do Projeto (visão geral)
 
-1. **Configure as variáveis de ambiente**
+   ```
+   servico-a/
+   ├── main.go # Inicializa o servidor e o tracer
+   ├── handler.go # Roteamento e lógica da API
+   ├── tracer.go # Configuração OpenTelemetry
+   ├── Dockerfile
+   ├── go.mod
+   └── go.sum
 
-   Todas as variáveis de ambiente são definidas nos respectivos arquivos Dockerfile em:
-   - `servico-a/Dockerfile`
-   - `servico-b/Dockerfile`
-   - `otel-collector/Dockerfile`
+   servico-b/
+   ├── main.go
+   ├── handler.go
+   ├── cep.go # Consulta API ViaCEP
+   ├── weather.go # Consulta API de clima
+   ├── tracer.go
+   ├── Dockerfile
+   ├── go.mod
+   └── go.sum
 
-2. **Suba todo o ambiente**
+   otel-collector/
+   ├── config.yaml # Configuração de receivers/exporters
+   └── Dockerfile
 
-   ```bash
-   make up
+   docker-compose.yaml # Orquestra tudo (A + B + OTEL + Zipkin)
+   Makefile # Facilita build e execução
+   README.md
    ```
 
-## 🧪 Testando os Serviços
+---
 
-Após subir o ambiente:
+## 🚀 Como Executar com Docker
+
+1. **Configure as variáveis de ambiente**  
+   Defina as variáveis no `docker-compose.yaml` (não é necessário `.env` separado).
+
+2. **Construa e suba os containers**
+   ```bash
+   docker-compose up --build -d
+   ```
+3. **Verifique se os serviços estão ativos**
 
    ```bash
-   make up
+   docker ps
    ```
-🔹 Testes com o VS Code REST Client ou Postman
+   - Serviço A: http://localhost:8080
+   - Serviço B: http://localhost:8081
+   - Zipkin UI: http://localhost:9411
 
-1. Abra o arquivo requests.http na raiz do projeto.
+## 🧪 Testando os Serviços (curl / REST Client)
 
-2. No VS Code, clique em "Send Request" acima de cada bloco de requisição.
+   Após iniciar o ambiente com make up ou docker-compose up -d, você pode testar das seguintes formas:
 
-3. Teste os seguintes cenários:
+   🔹 Teste via VS Code REST Client / Postman
 
-	* CEP válido → Retorna cidade e temperaturas (C, F, K)
-	* CEP inválido (menos de 8 dígitos) → Retorna erro 422 invalid zipcode
-	* CEP inexistente → Retorna erro 404 can not find zipcode
+      1. Abra o arquivo requests.http na raiz.
+      2. Clique em Send Request em cada bloco.
+      3. Teste:
+         - ✅ CEP válido → retorna cidade + temperaturas
+         - ❌ CEP inválido (menos de 8 dígitos) → erro 422
+         - ❌ CEP inexistente → erro 404
 
-4. Você também pode acessar Zipkin UI para verificar o tracing distribuído:
 
-	* URL: http://localhost:9411
+🔹 Teste via curl
 
-🔹 Testes manuais via curl
+      ```bash
+      curl -X POST http://localhost:8080/cep \
+           -H "Content-Type: application/json" \
+           -d '{"cep":"01001000"}'
+      ```
+## 🔍 **Visualizando Traces no Zipkin**
 
-   ```bash
-   curl -X POST http://localhost:8080/ \
-        -H "Content-Type: application/json" \
-        -d '{"cep":"01001000"}'
-   ```
+   Após uma requisição bem-sucedida:
 
-Isso permite verificar o trace distribuído entre serviço A e serviço B.
+      1. Acesse http://localhost:9411
+      2. Clique em “Run Query”
+      3. Você deverá ver spans encadeados:
 
-```bash
-curl http://localhost:9411
-```
+          ```bash
+          servico-a.handleCEP → HTTP POST servico-b → servico-b.handleWeather → HTTP GET ViaCEP
+          ```
+      
+   Isso indica que o tracing distribuído está funcionando corretamente.
+
+## 🧠 **Troubleshooting**
+
+   - invalid URL escape "%2F" → corrige-se garantindo que o endpoint OTEL não tenha barras duplas.
+   - Traces não aparecem → verifique logs do otel-collector e se o zipkin está saudável (docker ps → status “healthy”).]
+
+## **Licença**
+
+   MIT — livre para uso, modificação e distribuição.

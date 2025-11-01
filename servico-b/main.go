@@ -22,8 +22,8 @@ func main() {
 	shutdown := initTracer()
 	defer shutdown(context.Background())
 
-	http.Handle("/weather", otelhttp.NewHandler(http.HandlerFunc(handleWeather), "/weather"))
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
+	http.Handle("/weather", otelhttp.NewHandler(http.HandlerFunc(HandleWeatherByCEP), "/weather"))
+	http.HandleFunc("/healthz", HealthHandler)
 
 	log.Println("🌤️ servico-b listening on :8081")
 	log.Fatal(http.ListenAndServe(":8081", nil))

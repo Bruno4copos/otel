@@ -1,5 +1,7 @@
 ### ✅ [SUCESSO] CEP válido
-POST http://localhost:8080/
+@base_url = http://localhost:8080
+
+POST {{base_url}}/cep
 Content-Type: application/json
 
 {
@@ -7,7 +9,7 @@ Content-Type: application/json
 }
 
 ### ❌ [ERRO] CEP com formato inválido (menos de 8 dígitos)
-POST http://localhost:8080/
+POST {{base_url}}/cep
 Content-Type: application/json
 
 {
@@ -15,7 +17,7 @@ Content-Type: application/json
 }
 
 ### ❌ [ERRO] CEP inexistente
-POST http://localhost:8080/
+POST {{base_url}}/cep
 Content-Type: application/json
 
 {
@@ -23,10 +25,16 @@ Content-Type: application/json
 }
 
 ### 🧠 [TESTE DIRETO NO SERVIÇO B] CEP válido
-GET http://localhost:8081/weather?cep=01001000
+@base_url_b = http://localhost:8081
+GET {{base_url_b}}/weather?cep=01001000
 
 ### 🧠 [TESTE DIRETO NO SERVIÇO B] CEP inexistente
-GET http://localhost:8081/weather?cep=99999999
+GET {{base_url_b}}/weather?cep=99999999
+
+### 🩺 [HEALTH CHECK]
+GET {{base_url}}/healthz
+GET {{base_url_b}}/healthz
 
 ### ❤️ [ZIPKIN] Acessar o trace distribuído
 GET http://localhost:9411
+# Abra no navegador: http://localhost:9411
