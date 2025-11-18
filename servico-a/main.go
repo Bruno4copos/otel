@@ -16,7 +16,7 @@ func main() {
 	shutdown := initTracer()
 	defer shutdown(context.Background())
 
-	handler := otelhttp.NewHandler(http.HandlerFunc(handleCEP), "/cep")
+	handler := otelhttp.NewHandler(http.HandlerFunc(cepHandler), "/cep")
 	http.Handle("/cep", handler)
 
 	log.Println("🚀 servico-a listening on :8080")
